@@ -234,14 +234,17 @@ class MqttRequestAction(
           override def onFailure(value: Throwable): Unit =
             writeData(isSuccess = false, Some(value.getMessage))
 
-          override def onSuccess(void: Void): Unit =
+          override def onSuccess(void: Void): Unit = {
+            println("SEAN publish succeeded")
             writeData(isSuccess = true, None)
+            println("SEAN publish succeeded 2")
+          }
 
           private def writeData(isSuccess: Boolean, message: Option[String]) = {
             
             statsEngine.logResponse(session, requestName, ResponseTimings(nowMillis,nowMillis) ,
                 if (isSuccess) OK else KO,
-            message, null)
+            None, message, null)
             next ! session
 
             connection.disconnect(null)
