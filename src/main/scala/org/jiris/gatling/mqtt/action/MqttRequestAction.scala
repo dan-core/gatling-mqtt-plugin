@@ -168,6 +168,9 @@ class MqttRequestAction(
     if (maxWriteRate.isDefined) {
       mqtt.setMaxWriteRate(maxWriteRate.get)
     }
+    
+    mqtt.setUserName("intuser")
+    mqtt.setPassword("password")
   }
   override def name:String =" Name"
   override def execute(session: Session):Unit = recover(session) {
@@ -182,7 +185,8 @@ class MqttRequestAction(
       configureOptions(resolvedMqtt)
       
       val connection = resolvedMqtt.callbackConnection()
-      println("SEAN connecting...")
+      println("SEAN connecting... using " + connection)
+      println(resolvedMqtt.getHost)
       connection.connect(new Callback[Void] {
         override def onSuccess(void: Void): Unit = {
           println("SEAN connected!")
@@ -200,6 +204,8 @@ class MqttRequestAction(
           }
         }
         override def onFailure(value: Throwable): Unit = {
+          println("SEAN failed!")
+          value.printStackTrace()
           mqttAttributes.requestName(session).map { resolvedRequestName =>
            // MqttRequestAction.reportUnbuildableRequest(
              // resolvedRequestName, session, value.getMessage)
