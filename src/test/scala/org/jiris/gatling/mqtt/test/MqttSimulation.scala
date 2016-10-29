@@ -16,6 +16,6 @@ class MqttSimulation extends Simulation {
    System.out.println()
   setUp(
     scn
-      .inject(constantUsersPerSec(1) during(1 seconds)))
+      .inject(atOnceUsers(1)))
     .protocols(mqttConf)
 }

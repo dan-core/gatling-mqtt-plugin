@@ -182,8 +182,10 @@ class MqttRequestAction(
       configureOptions(resolvedMqtt)
       
       val connection = resolvedMqtt.callbackConnection()
+      println("SEAN connecting...")
       connection.connect(new Callback[Void] {
         override def onSuccess(void: Void): Unit = {
+          println("SEAN connected!")
           mqttAttributes.requestName(session).flatMap { resolvedRequestName =>
             mqttAttributes.topic(session).flatMap { resolvedTopic =>
               sendRequest(
