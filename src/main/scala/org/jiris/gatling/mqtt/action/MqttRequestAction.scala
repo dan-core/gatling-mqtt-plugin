@@ -1,34 +1,37 @@
-package com.github.mnogu.gatling.mqtt.action
+package org.jiris.gatling.mqtt.action
 
 import akka.actor.ActorRef
-import com.github.mnogu.gatling.mqtt.config.MqttProtocol
-import com.github.mnogu.gatling.mqtt.request.builder.MqttAttributes
+import org.jiris.gatling.mqtt.protocol.MqttProtocol
+import org.jiris.gatling.mqtt.request.builder.MqttAttributes
 import io.gatling.core.Predef._
-import io.gatling.core.action.{Failable, Interruptable}
-import io.gatling.core.result.message.{KO, OK}
-import io.gatling.core.result.writer.DataWriterClient
+import io.gatling.core.action.{Action, ExitableAction}
+import io.gatling.commons.stats.{KO,OK}
+import io.gatling.core.stats.StatsEngine
 import io.gatling.core.session._
-import io.gatling.core.util.TimeHelper._
-import io.gatling.core.validation.Validation
+import io.gatling.commons.util.TimeHelper._
+import io.gatling.commons.validation.Validation
 import org.fusesource.mqtt.client.{MQTT, Callback, QoS, CallbackConnection}
-
-object MqttRequestAction extends DataWriterClient {
-  def reportUnbuildableRequest(
-      requestName: String,
-      session: Session,
-      errorMessage: String): Unit = {
-    val now = nowMillis
-    writeRequestData(
-      session, requestName, now, now, now, now, KO, Some(errorMessage))
-  }
-}
+import io.gatling.core.stats.message.ResponseTimings
+import org.jiris.gatling.mqtt.protocol.MqttProtocol
+//object MqttRequestAction extends ExitableAction {
+//  def reportUnbuildableRequest(
+//      requestName: String,
+//      session: Session,
+//      errorMessage: String): Unit = {
+//    val now = nowMillis
+//    statsEngine.reportUnbuildableRequest(session, requestName, errorMessage)
+//  // writeRequestData(
+//    //  session, requestName, now, now, now, now, KO, Some(errorMessage))
+//  }
+//}
 
 class MqttRequestAction(
+  val statsEngine: StatsEngine,
   val mqtt: MQTT,
   val mqttAttributes: MqttAttributes,
   val mqttProtocol: MqttProtocol,
-  val next: ActorRef)
-    extends Interruptable with Failable with DataWriterClient {
+  val next: Action)
+    extends ExitableAction  {
 
   private def configureHost(session: Session)(mqtt: MQTT): Validation[MQTT] = {
     mqttProtocol.host match {
@@ -166,8 +169,8 @@ class MqttRequestAction(
       mqtt.setMaxWriteRate(maxWriteRate.get)
     }
   }
-
-  override def executeOrFail(session: Session): Validation[Unit] = {
+  override def name:String =" Name"
+  override def execute(session: Session):Unit = recover(session) {
     configureHost(session)(mqtt)
       .flatMap(configureClientId(session))
       .flatMap(configureUserName(session))
@@ -177,7 +180,7 @@ class MqttRequestAction(
       .flatMap(configureVersion(session)).map { resolvedMqtt =>
 
       configureOptions(resolvedMqtt)
-
+      
       val connection = resolvedMqtt.callbackConnection()
       connection.connect(new Callback[Void] {
         override def onSuccess(void: Void): Unit = {
@@ -196,8 +199,9 @@ class MqttRequestAction(
         }
         override def onFailure(value: Throwable): Unit = {
           mqttAttributes.requestName(session).map { resolvedRequestName =>
-            MqttRequestAction.reportUnbuildableRequest(
-              resolvedRequestName, session, value.getMessage)
+           // MqttRequestAction.reportUnbuildableRequest(
+             // resolvedRequestName, session, value.getMessage)
+            statsEngine.reportUnbuildableRequest(session, resolvedRequestName, value.getMessage)
           }
           connection.disconnect(null)
         }
@@ -213,7 +217,6 @@ class MqttRequestAction(
       qos: QoS,
       retain: Boolean,
       session: Session): Validation[Unit] = {
-
     payload(session).map { resolvedPayload =>
       val requestStartDate = nowMillis
       val requestEndDate = nowMillis
@@ -227,19 +230,10 @@ class MqttRequestAction(
             writeData(isSuccess = true, None)
 
           private def writeData(isSuccess: Boolean, message: Option[String]) = {
-            val responseStartDate = nowMillis
-            val responseEndDate = nowMillis
-
-            writeRequestData(
-              session,
-              requestName,
-              requestStartDate,
-              requestEndDate,
-              responseStartDate,
-              responseEndDate,
-              if (isSuccess) OK else KO,
-              message)
-
+            
+            statsEngine.logResponse(session, requestName, ResponseTimings(nowMillis,nowMillis) ,
+                if (isSuccess) OK else KO,
+            message, null)
             next ! session
 
             connection.disconnect(null)

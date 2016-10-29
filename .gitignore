@@ -66,5 +66,16 @@ project/plugins/project/
 # Scala-IDE specific
 .scala_dependencies
 .worksheet
+/target/
+/.settings
+/.classpath
+/.project
 
+#Eclipse
+.cache-main
+.cache-tests
+.classpath
+.project
+.settings/
 
+/bin/

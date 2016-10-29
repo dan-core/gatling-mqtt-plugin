@@ -1,7 +1,7 @@
-package com.github.mnogu.gatling.mqtt.request.builder
+package org.jiris.gatling.mqtt.request.builder
 
-import com.github.mnogu.gatling.mqtt.action.MqttRequestActionBuilder
-import com.github.mnogu.gatling.mqtt.config.MqttProtocol
+import org.jiris.gatling.mqtt.action.MqttRequestActionBuilder
+import org.jiris.gatling.mqtt.protocol.MqttProtocol
 import io.gatling.core.session.Expression
 import org.fusesource.mqtt.client.QoS
 
