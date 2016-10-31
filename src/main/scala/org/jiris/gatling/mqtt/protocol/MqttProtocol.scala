@@ -12,10 +12,9 @@ object MqttProtocol  {
     type Protocol = MqttProtocol
     type Components = MqttComponents
     def protocolClass: Class[io.gatling.core.protocol.Protocol] = classOf[MqttProtocol].asInstanceOf[Class[io.gatling.core.protocol.Protocol]]
-
- def defaultValue(configuration: io.gatling.core.config.GatlingConfiguration): MqttProtocol = apply
- def newComponents(system: akka.actor.ActorSystem,coreComponents: io.gatling.core.CoreComponents): MqttProtocol => MqttComponents = mqttProtocol => 
- MqttComponents(mqttProtocol)
+    def defaultValue(configuration: io.gatling.core.config.GatlingConfiguration): MqttProtocol = apply
+    def newComponents(system: akka.actor.ActorSystem,coreComponents: io.gatling.core.CoreComponents): MqttProtocol => MqttComponents = mqttProtocol => 
+      MqttComponents(mqttProtocol)
   }
   def apply: MqttProtocol = MqttProtocol(
     host = None,

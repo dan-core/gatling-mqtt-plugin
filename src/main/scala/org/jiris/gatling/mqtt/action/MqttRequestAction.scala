@@ -13,17 +13,6 @@ import io.gatling.commons.validation.Validation
 import org.fusesource.mqtt.client.{MQTT, Callback, QoS, CallbackConnection}
 import io.gatling.core.stats.message.ResponseTimings
 import org.jiris.gatling.mqtt.protocol.MqttProtocol
-//object MqttRequestAction extends ExitableAction {
-//  def reportUnbuildableRequest(
-//      requestName: String,
-//      session: Session,
-//      errorMessage: String): Unit = {
-//    val now = nowMillis
-//    statsEngine.reportUnbuildableRequest(session, requestName, errorMessage)
-//  // writeRequestData(
-//    //  session, requestName, now, now, now, now, KO, Some(errorMessage))
-//  }
-//}
 
 class MqttRequestAction(
   val statsEngine: StatsEngine,
@@ -168,9 +157,6 @@ class MqttRequestAction(
     if (maxWriteRate.isDefined) {
       mqtt.setMaxWriteRate(maxWriteRate.get)
     }
-    
-    mqtt.setUserName("intuser")
-    mqtt.setPassword("password")
   }
   override def name:String =" Name"
   override def execute(session: Session):Unit = recover(session) {
@@ -181,15 +167,10 @@ class MqttRequestAction(
       .flatMap(configureWillTopic(session))
       .flatMap(configureWillMessage(session))
       .flatMap(configureVersion(session)).map { resolvedMqtt =>
-
       configureOptions(resolvedMqtt)
-      
       val connection = resolvedMqtt.callbackConnection()
-      println("SEAN connecting... using " + connection)
-      println(resolvedMqtt.getHost)
       connection.connect(new Callback[Void] {
         override def onSuccess(void: Void): Unit = {
-          println("SEAN connected!")
           mqttAttributes.requestName(session).flatMap { resolvedRequestName =>
             mqttAttributes.topic(session).flatMap { resolvedTopic =>
               sendRequest(
@@ -204,13 +185,13 @@ class MqttRequestAction(
           }
         }
         override def onFailure(value: Throwable): Unit = {
-          println("SEAN failed!")
           value.printStackTrace()
           mqttAttributes.requestName(session).map { resolvedRequestName =>
-           // MqttRequestAction.reportUnbuildableRequest(
-             // resolvedRequestName, session, value.getMessage)
-            statsEngine.reportUnbuildableRequest(session, resolvedRequestName, value.getMessage)
-          }
+          statsEngine.logResponse(session, resolvedRequestName, ResponseTimings(nowMillis,nowMillis) ,
+                KO,
+            None, Some(value.getMessage))
+            }
+            next ! session
           connection.disconnect(null)
         }
       })
@@ -227,26 +208,21 @@ class MqttRequestAction(
       session: Session): Validation[Unit] = {
     payload(session).map { resolvedPayload =>
       val requestStartDate = nowMillis
-      val requestEndDate = nowMillis
+     
 
       connection.publish(
         topic, resolvedPayload.getBytes, qos, retain, new Callback[Void] {
           override def onFailure(value: Throwable): Unit =
             writeData(isSuccess = false, Some(value.getMessage))
-
           override def onSuccess(void: Void): Unit = {
-            println("SEAN publish succeeded")
             writeData(isSuccess = true, None)
-            println("SEAN publish succeeded 2")
           }
-
+           
           private def writeData(isSuccess: Boolean, message: Option[String]) = {
-            
-            statsEngine.logResponse(session, requestName, ResponseTimings(nowMillis,nowMillis) ,
+            statsEngine.logResponse(session, requestName, ResponseTimings(requestStartDate,nowMillis) ,
                 if (isSuccess) OK else KO,
-            None, message, null)
+            None, message)
             next ! session
-
             connection.disconnect(null)
           }
         })
