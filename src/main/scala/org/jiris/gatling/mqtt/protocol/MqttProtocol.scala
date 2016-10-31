@@ -1,12 +1,22 @@
-package com.github.mnogu.gatling.mqtt.config
+package org.jiris.gatling.mqtt.protocol
 
-import io.gatling.core.config.Protocol
+import io.gatling.core.protocol.{ ProtocolKey, Protocol }
 import io.gatling.core.session.Expression
-
+import io.gatling.core.config.GatlingConfiguration
 import org.fusesource.mqtt.client.QoS
+ 
+object MqttProtocol  {
 
-object MqttProtocol {
-  val DefaultMqttProtocol = MqttProtocol(
+  val MqttProtocolKey = new ProtocolKey {
+
+    type Protocol = MqttProtocol
+    type Components = MqttComponents
+    def protocolClass: Class[io.gatling.core.protocol.Protocol] = classOf[MqttProtocol].asInstanceOf[Class[io.gatling.core.protocol.Protocol]]
+    def defaultValue(configuration: io.gatling.core.config.GatlingConfiguration): MqttProtocol = apply
+    def newComponents(system: akka.actor.ActorSystem,coreComponents: io.gatling.core.CoreComponents): MqttProtocol => MqttComponents = mqttProtocol => 
+      MqttComponents(mqttProtocol)
+  }
+  def apply: MqttProtocol = MqttProtocol(
     host = None,
     optionPart = MqttProtocolOptionPart(
       clientId = None,
@@ -35,15 +45,14 @@ object MqttProtocol {
 }
 
 case class MqttProtocol(
+    
   host: Option[Expression[String]],
   optionPart: MqttProtocolOptionPart,
   reconnectPart: MqttProtocolReconnectPart,
   socketPart: MqttProtocolSocketPart,
   throttlingPart: MqttProtocolThrottlingPart) extends Protocol {
-
+ type Components = MqttComponents
   def host(host: Expression[String]): MqttProtocol = copy(host = Some(host))
-
-  // optionPart
   def clientId(clientId: Expression[String]): MqttProtocol = copy(
     optionPart = optionPart.copy(clientId = Some(clientId)))
   def cleanSession(cleanSession: Boolean): MqttProtocol = copy(
