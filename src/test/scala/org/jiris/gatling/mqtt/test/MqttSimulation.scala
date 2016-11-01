@@ -8,10 +8,10 @@ import org.jiris.gatling.mqtt.Predef._
 import org.jiris.gatling.mqtt.protocol.MqttProtocol
 
 class MqttSimulation extends Simulation {
-  val mqttConf= mqtt.host("ssl://localhost:8883").userName("intuser").password("password")
+  val mqttConf= mqtt.host("ssl://localhost:8883")
   val scn = scenario("MQTT Test")
     .exec(mqtt("request")
-    .publish("foo", "Hello", QoS.AT_LEAST_ONCE, retain = false))
+    .publish(topic = "foo", payload = "Hello", qos = QoS.AT_LEAST_ONCE, retain = false))
   setUp(
     scn
       .inject(atOnceUsers(1)))

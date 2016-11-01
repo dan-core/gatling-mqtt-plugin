@@ -32,34 +32,71 @@ class MqttRequestAction(
     }
   }
 
-  private def configureClientId(session: Session)(mqtt: MQTT): Validation[MQTT] = {
-    mqttProtocol.optionPart.clientId match {
+  private def configureClientId(session: Session, mqttAttributes: MqttAttributes)(mqtt: MQTT): Validation[MQTT] = {
+    if(!Some(mqttAttributes.clientId).isEmpty){
+      mqttAttributes.clientId match {
       case Some(clientId) => clientId(session).map { resolvedClientId =>
         mqtt.setClientId(resolvedClientId)
         mqtt
+      } 
+      case None => {
+        mqtt
       }
-      case None => mqtt
-    }
+      }
+     } else {
+      mqttProtocol.optionPart.clientId match {
+        case Some(clientId) => clientId(session).map { resolvedClientId =>
+          mqtt.setClientId(resolvedClientId)
+          mqtt
+        }
+        case None => mqtt
+      }
+     }
   }
 
-  private def configureUserName(session: Session)(mqtt: MQTT): Validation[MQTT] = {
-    mqttProtocol.optionPart.userName match {
+  private def configureUserName(session: Session, mqttAttributes: MqttAttributes)(mqtt: MQTT): Validation[MQTT] = {
+    
+    if(!Some(mqttAttributes.username).isEmpty){
+      mqttAttributes.username match {
+      case Some(username) => username(session).map { resolvedUserName =>
+        mqtt.setUserName(resolvedUserName)
+        mqtt
+      } 
+      case None => {
+        mqtt
+      }
+      }
+    } else {
+      mqttProtocol.optionPart.userName match {
       case Some(userName) => userName(session).map { resolvedUserName =>
         mqtt.setUserName(resolvedUserName)
         mqtt
       }
       case None => mqtt
     }
+      }
   }
 
-  private def configurePassword(session: Session)(mqtt: MQTT): Validation[MQTT] = {
-    mqttProtocol.optionPart.password match {
+  private def configurePassword(session: Session, mqttAttributes: MqttAttributes)(mqtt: MQTT): Validation[MQTT] = {
+     if(!Some(mqttAttributes.password).isEmpty){
+      mqttAttributes.password match {
       case Some(password) => password(session).map { resolvedPassword =>
         mqtt.setPassword(resolvedPassword)
         mqtt
+      } 
+      case None => {
+        mqtt
       }
-      case None => mqtt
-    }
+      }
+     } else {
+        mqttProtocol.optionPart.password match {
+          case Some(password) => password(session).map { resolvedPassword =>
+            mqtt.setPassword(resolvedPassword)
+            mqtt
+          }
+          case None => mqtt
+        }
+     }
   }
 
   private def configureWillTopic(session: Session)(mqtt: MQTT): Validation[MQTT] = {
@@ -160,10 +197,11 @@ class MqttRequestAction(
   }
   override def name:String =" Name"
   override def execute(session: Session):Unit = recover(session) {
+    
     configureHost(session)(mqtt)
-      .flatMap(configureClientId(session))
-      .flatMap(configureUserName(session))
-      .flatMap(configurePassword(session))
+      .flatMap(configureClientId(session,mqttAttributes))
+      .flatMap(configureUserName(session,mqttAttributes))
+      .flatMap(configurePassword(session,mqttAttributes))
       .flatMap(configureWillTopic(session))
       .flatMap(configureWillMessage(session))
       .flatMap(configureVersion(session)).map { resolvedMqtt =>
@@ -208,8 +246,6 @@ class MqttRequestAction(
       session: Session): Validation[Unit] = {
     payload(session).map { resolvedPayload =>
       val requestStartDate = nowMillis
-     
-
       connection.publish(
         topic, resolvedPayload.getBytes, qos, retain, new Callback[Void] {
           override def onFailure(value: Throwable): Unit =
@@ -217,7 +253,6 @@ class MqttRequestAction(
           override def onSuccess(void: Void): Unit = {
             writeData(isSuccess = true, None)
           }
-           
           private def writeData(isSuccess: Boolean, message: Option[String]) = {
             statsEngine.logResponse(session, requestName, ResponseTimings(requestStartDate,nowMillis) ,
                 if (isSuccess) OK else KO,
