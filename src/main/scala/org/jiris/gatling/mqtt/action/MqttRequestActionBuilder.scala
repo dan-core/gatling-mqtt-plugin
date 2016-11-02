@@ -18,7 +18,6 @@ class MqttRequestActionBuilder(mqttAttributes: MqttAttributes)
 
 def mqttComponents(protocolComponentsRegistry: ProtocolComponentsRegistry): MqttComponents =
     protocolComponentsRegistry.components(MqttProtocol.MqttProtocolKey)
-    
   def build(ctx:ScenarioContext,next: Action): Action = {
     val mqttProtocol = mqttComponents(ctx.protocolComponentsRegistry).mqttProtocol
     val mqtt = new MQTT()
