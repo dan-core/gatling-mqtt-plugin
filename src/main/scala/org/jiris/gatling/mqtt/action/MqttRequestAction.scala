@@ -13,6 +13,7 @@ import io.gatling.commons.validation.Validation
 import org.fusesource.mqtt.client.{MQTT, Callback, QoS, CallbackConnection}
 import io.gatling.core.stats.message.ResponseTimings
 import org.jiris.gatling.mqtt.protocol.MqttProtocol
+import scala.util.control.NonFatal
 
 class MqttRequestAction(
   val statsEngine: StatsEngine,
@@ -195,9 +196,26 @@ class MqttRequestAction(
       mqtt.setMaxWriteRate(maxWriteRate.get)
     }
   }
+  
   override def name:String =" Name"
+  
   override def execute(session: Session):Unit = recover(session) {
-    
+    mqttProtocol.socketPart.shareConnection match {
+      case Some(true) =>
+        CallbackConnections(session) match {
+          case Some(connection) => send(session, connection)
+          case _ =>
+            createConnection(session).map { connection =>
+              CallbackConnections += session -> connection
+              connectAndSend(session, connection)
+            }
+        }
+      case _ => createConnection(session).map { connectAndSend(session, _) }
+        
+    }
+  }
+
+  private def createConnection(session: Session) =
     configureHost(session)(mqtt)
       .flatMap(configureClientId(session,mqttAttributes))
       .flatMap(configureUserName(session,mqttAttributes))
@@ -205,37 +223,44 @@ class MqttRequestAction(
       .flatMap(configureWillTopic(session))
       .flatMap(configureWillMessage(session))
       .flatMap(configureVersion(session)).map { resolvedMqtt =>
-      configureOptions(resolvedMqtt)
-      val connection = resolvedMqtt.callbackConnection()
-      connection.connect(new Callback[Void] {
-        override def onSuccess(void: Void): Unit = {
-          mqttAttributes.requestName(session).flatMap { resolvedRequestName =>
-            mqttAttributes.topic(session).flatMap { resolvedTopic =>
-              sendRequest(
-                resolvedRequestName,
-                connection,
-                resolvedTopic,
-                mqttAttributes.payload,
-                mqttAttributes.qos,
-                mqttAttributes.retain,
-                session)
-            }
+        configureOptions(resolvedMqtt)
+        resolvedMqtt.callbackConnection()
+      }
+
+  private def connectAndSend(session: Session, connection: CallbackConnection) {
+    connection.connect(new Callback[Void] {
+      override def onSuccess(void: Void): Unit = {
+        send(session, connection)
+      }
+      
+      override def onFailure(value: Throwable): Unit = {
+        value.printStackTrace()
+        mqttAttributes.requestName(session).map { resolvedRequestName =>
+        statsEngine.logResponse(session, resolvedRequestName, ResponseTimings(nowMillis,nowMillis) ,
+              KO,
+          None, Some(value.getMessage))
           }
-        }
-        override def onFailure(value: Throwable): Unit = {
-          value.printStackTrace()
-          mqttAttributes.requestName(session).map { resolvedRequestName =>
-          statsEngine.logResponse(session, resolvedRequestName, ResponseTimings(nowMillis,nowMillis) ,
-                KO,
-            None, Some(value.getMessage))
-            }
-            next ! session
-          connection.disconnect(null)
-        }
-      })
+          next ! session
+        connection.disconnect(null)
+      }
+    })
+  }
+  
+  private def send(session: Session, connection: CallbackConnection) {
+    mqttAttributes.requestName(session).flatMap { resolvedRequestName =>
+      mqttAttributes.topic(session).flatMap { resolvedTopic =>
+        sendRequest(
+          resolvedRequestName,
+          connection,
+          resolvedTopic,
+          mqttAttributes.payload,
+          mqttAttributes.qos,
+          mqttAttributes.retain,
+          session)
+      }
     }
   }
-
+  
   private def sendRequest(
       requestName: String,
       connection: CallbackConnection,
@@ -247,21 +272,54 @@ class MqttRequestAction(
     payload(session).map { resolvedPayload =>
       val requestStartDate = nowMillis
       connection.publish(
-        topic, resolvedPayload.getBytes, qos, retain, new Callback[Void] {
+        topic, 
+        resolvedPayload.getBytes, 
+        qos, 
+        retain, 
+        new Callback[Void] {
           override def onFailure(value: Throwable): Unit =
             writeData(isSuccess = false, Some(value.getMessage))
           override def onSuccess(void: Void): Unit = {
             writeData(isSuccess = true, None)
           }
           private def writeData(isSuccess: Boolean, message: Option[String]) = {
-            statsEngine.logResponse(session, requestName, ResponseTimings(requestStartDate,nowMillis) ,
+            statsEngine.logResponse(
+                session, requestName, ResponseTimings(requestStartDate,nowMillis) ,
                 if (isSuccess) OK else KO,
-            None, message)
+                None, message
+            )
             next ! session
-            connection.disconnect(null)
+            mqttProtocol.socketPart.shareConnection match {
+              case Some(true) => // nothing
+              case _ => connection.disconnect(null)
+            }
           }
-        })
+        }
+      )
+    }
+  }
+}
 
+object CallbackConnections {
+  private val connsBySession = collection.mutable.Map[String, CallbackConnection]()
+  
+  private def key(session: Session) = s"${session.scenario}:${session.userId}"
+  
+  def apply(session: Session) = synchronized {
+    connsBySession.get(key(session))
+  }
+
+  def +=(tuple: Tuple2[Session, CallbackConnection]) = synchronized {
+    connsBySession += key(tuple._1) -> tuple._2
+  }
+  
+  // TODO call this from somewhere to dispose connections after test is done
+  def close(session: Session) = {
+    connsBySession.get(key(session)) match {
+      case Some(connection) => try connection.disconnect(null) catch {
+        case NonFatal(e) => // ignore
+      }
+      case _ => // ignore
     }
   }
 }

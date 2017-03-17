@@ -38,7 +38,8 @@ object MqttProtocol  {
     socketPart = MqttProtocolSocketPart(
       receiveBufferSize = None,
       sendBufferSize = None,
-      trafficClass = None),
+      trafficClass = None,
+      shareConnection = None),
     throttlingPart = MqttProtocolThrottlingPart(
       maxReadRate = None,
       maxWriteRate = None))
@@ -98,6 +99,8 @@ case class MqttProtocol(
     socketPart = socketPart.copy(sendBufferSize = Some(sendBufferSize)))
   def trafficClass(trafficClass: Int): MqttProtocol = copy(
     socketPart = socketPart.copy(trafficClass = Some(trafficClass)))
+  def shareConnection(share: Boolean): MqttProtocol = copy(
+    socketPart = socketPart.copy(shareConnection = Some(share)))
 
   // throttlingPart
   def maxReadRate(maxReadRate: Int): MqttProtocol = copy(
@@ -128,7 +131,8 @@ case class MqttProtocolReconnectPart(
 case class MqttProtocolSocketPart(
   receiveBufferSize: Option[Int],
   sendBufferSize: Option[Int],
-  trafficClass: Option[Int])
+  trafficClass: Option[Int],
+  shareConnection: Option[Boolean])
 
 case class MqttProtocolThrottlingPart(
   maxReadRate: Option[Int],
