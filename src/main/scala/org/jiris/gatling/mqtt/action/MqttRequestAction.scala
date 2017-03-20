@@ -20,8 +20,7 @@ class MqttRequestAction(
   val mqtt: MQTT,
   val mqttAttributes: MqttAttributes,
   val mqttProtocol: MqttProtocol,
-  val next: Action)
-    extends ExitableAction  {
+  val next: Action) extends ExitableAction {
 
   private def configureHost(session: Session)(mqtt: MQTT): Validation[MQTT] = {
     mqttProtocol.host match {
@@ -211,7 +210,6 @@ class MqttRequestAction(
             }
         }
       case _ => createConnection(session).map { connectAndSend(session, _) }
-        
     }
   }
 

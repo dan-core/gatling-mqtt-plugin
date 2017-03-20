@@ -13,17 +13,28 @@ import io.gatling.core.protocol.ProtocolComponents
 import com.typesafe.scalalogging.Logger
 import io.gatling.core.session.Session
 
-class MqttRequestActionBuilder(mqttAttributes: MqttAttributes)
-  extends ActionBuilder {
-
-def mqttComponents(protocolComponentsRegistry: ProtocolComponentsRegistry): MqttComponents =
-    protocolComponentsRegistry.components(MqttProtocol.MqttProtocolKey)
-  def build(ctx:ScenarioContext,next: Action): Action = {
+class MqttRequestActionBuilder(mqttAttributes: MqttAttributes) extends ActionBuilder {
+  def mqttComponents(protocolComponentsRegistry: ProtocolComponentsRegistry): MqttComponents =
+      protocolComponentsRegistry.components(MqttProtocol.MqttProtocolKey)
+      
+  def build(ctx:ScenarioContext, next: Action): Action = {
     val mqttProtocol = mqttComponents(ctx.protocolComponentsRegistry).mqttProtocol
-    val mqtt = new MQTT()
     
-    new MqttRequestAction(
-       ctx.coreComponents.statsEngine,
-      mqtt, mqttAttributes, mqttProtocol, next)
+    mqttProtocol.impl match {
+      case Some("paho") =>
+        new PahoMqttRequestAction(
+            ctx.coreComponents.statsEngine,
+            mqttAttributes, 
+            mqttProtocol, 
+            next
+        )
+      case _ =>
+        new MqttRequestAction(
+            ctx.coreComponents.statsEngine,
+            new MQTT, 
+            mqttAttributes, 
+            mqttProtocol, 
+            next)
+        }
   }
 }

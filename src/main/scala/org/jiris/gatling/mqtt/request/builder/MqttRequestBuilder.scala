@@ -17,13 +17,13 @@ case class MqttAttributes(
 
 case class MqttRequestBuilder(requestName: Expression[String]) {
   def publish(
-    topic: Expression[String],
-    payload: Expression[String],
-    qos: QoS,
-    retain: Boolean,
-    userName: Option[Expression[String]] = None,
-    password: Option[Expression[String]] = None,
-    clientId: Option[Expression[String]] = None): MqttRequestActionBuilder =
+      topic: Expression[String],
+      payload: Expression[String],
+      qos: QoS,
+      retain: Boolean,
+      userName: Option[Expression[String]] = None,
+      password: Option[Expression[String]] = None,
+      clientId: Option[Expression[String]] = None): MqttRequestActionBuilder =
     new MqttRequestActionBuilder(MqttAttributes(
       requestName,
       topic,
