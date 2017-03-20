@@ -13,7 +13,8 @@ libraryDependencies ++= Seq(
   "io.gatling.highcharts" % "gatling-charts-highcharts" % "2.2.2",
   "io.gatling"            % "gatling-test-framework"    % "2.2.2",
 
-  "org.fusesource.mqtt-client" % "mqtt-client" % "1.10"
+  "org.fusesource.mqtt-client" % "mqtt-client" % "1.10",
+  "org.eclipse.paho" % "org.eclipse.paho.client.mqttv3" % "1.1.0"
 )
 
 // Gatling contains scala-library

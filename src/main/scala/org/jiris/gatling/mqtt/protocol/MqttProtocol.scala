@@ -6,9 +6,7 @@ import io.gatling.core.config.GatlingConfiguration
 import org.fusesource.mqtt.client.QoS
  
 object MqttProtocol  {
-
   val MqttProtocolKey = new ProtocolKey {
-
     type Protocol = MqttProtocol
     type Components = MqttComponents
     def protocolClass: Class[io.gatling.core.protocol.Protocol] = classOf[MqttProtocol].asInstanceOf[Class[io.gatling.core.protocol.Protocol]]
@@ -16,7 +14,9 @@ object MqttProtocol  {
     def newComponents(system: akka.actor.ActorSystem,coreComponents: io.gatling.core.CoreComponents): MqttProtocol => MqttComponents = mqttProtocol => 
       MqttComponents(mqttProtocol)
   }
+  
   def apply: MqttProtocol = MqttProtocol(
+    impl = None,
     host = None,
     optionPart = MqttProtocolOptionPart(
       clientId = None,
@@ -27,6 +27,7 @@ object MqttProtocol  {
       willTopic = None,
       willMessage = None,
       willQos = None,
+      willQosInt = None,
       willRetain = None,
       version = None),
     reconnectPart = MqttProtocolReconnectPart(
@@ -42,17 +43,21 @@ object MqttProtocol  {
       shareConnection = None),
     throttlingPart = MqttProtocolThrottlingPart(
       maxReadRate = None,
-      maxWriteRate = None))
+      maxWriteRate = None)
+  )
 }
 
 case class MqttProtocol(
-    
-  host: Option[Expression[String]],
-  optionPart: MqttProtocolOptionPart,
-  reconnectPart: MqttProtocolReconnectPart,
-  socketPart: MqttProtocolSocketPart,
-  throttlingPart: MqttProtocolThrottlingPart) extends Protocol {
- type Components = MqttComponents
+    impl: Option[String],
+    host: Option[Expression[String]],
+    optionPart: MqttProtocolOptionPart,
+    reconnectPart: MqttProtocolReconnectPart,
+    socketPart: MqttProtocolSocketPart,
+    throttlingPart: MqttProtocolThrottlingPart) extends Protocol {
+  type Components = MqttComponents
+  
+  def paho: MqttProtocol = copy(impl = Some("paho"))
+  def impl(impl: String): MqttProtocol = copy(impl = Some(impl))
   def host(host: Expression[String]): MqttProtocol = copy(host = Some(host))
   def clientId(clientId: Expression[String]): MqttProtocol = copy(
     optionPart = optionPart.copy(clientId = Some(clientId)))
@@ -70,6 +75,8 @@ case class MqttProtocol(
     optionPart = optionPart.copy(willMessage = Some(willMessage)))
   def willQos(willQos: QoS): MqttProtocol = copy(
     optionPart = optionPart.copy(willQos = Some(willQos)))
+  def willQosInt(willQos: Int): MqttProtocol = copy(
+    optionPart = optionPart.copy(willQosInt = Some(willQos)))
   def willRetain(willRetain: Boolean): MqttProtocol = copy(
     optionPart = optionPart.copy(willRetain = Some(willRetain)))
   def version(version: Expression[String]): MqttProtocol = copy(
@@ -118,6 +125,7 @@ case class MqttProtocolOptionPart(
   willTopic: Option[Expression[String]],
   willMessage: Option[Expression[String]],
   willQos: Option[QoS],
+  willQosInt: Option[Int],
   willRetain: Option[Boolean],
   version: Option[Expression[String]])
 
