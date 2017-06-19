@@ -1,6 +1,7 @@
 package org.jiris.gatling.mqtt.request.builder
 
 import org.jiris.gatling.mqtt.action.MqttRequestActionBuilder
+import org.jiris.gatling.mqtt.action.MqttSubscribeActionBuilder
 import org.jiris.gatling.mqtt.protocol.MqttProtocol
 import io.gatling.core.session.Expression
 import org.fusesource.mqtt.client.QoS
@@ -30,6 +31,23 @@ case class MqttRequestBuilder(requestName: Expression[String]) {
       payload,
       qos,
       retain,
+      userName,
+      password,
+      clientId))
+
+  def subscribe(
+      topic: Expression[String],
+      expectedPayload: Expression[String],
+      qos: QoS,
+      userName: Option[Expression[String]] = None,
+      password: Option[Expression[String]] = None,
+      clientId: Option[Expression[String]] = None): MqttSubscribeActionBuilder =
+    new MqttSubscribeActionBuilder(MqttAttributes(
+      requestName,
+      topic,
+      expectedPayload,
+      qos,
+      false,
       userName,
       password,
       clientId))
