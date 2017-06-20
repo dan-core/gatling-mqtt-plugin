@@ -105,7 +105,7 @@ class PahoMqttSubscribeAction(
         println("CONN: Disconnected!! " + connection.getClientId)
       }
       try {
-      println("MQTT: Going to subscribe: "+topic)
+      //println("MQTT: Going to subscribe: "+topic)
       connection.unsubscribe(topic)
       connection.subscribe(
         topic,
@@ -141,7 +141,7 @@ class PahoMqttSubscribeAction(
             val requestTimestamp = getTimeStamp(new String(message.getPayload))
             
             if (requestTimestamp != 0 ) {
-              println("MQTT: clientId: " + connection.getClientId + " elapsed ms: " + (System.currentTimeMillis - requestTimestamp).toString)
+              //println("MQTT: clientId: " + connection.getClientId + " elapsed ms: " + (System.currentTimeMillis - requestTimestamp).toString)
               statsEngine.logResponse(
                 session, requestName, ResponseTimings(requestTimestamp, System.currentTimeMillis),
                 OK,
