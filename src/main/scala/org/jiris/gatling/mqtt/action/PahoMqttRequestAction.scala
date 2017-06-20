@@ -40,7 +40,6 @@ class PahoMqttRequestAction(
     connection.client.connect(connection.options, null, new IMqttActionListener {
       override def onSuccess(token: IMqttToken) {
         println("CONN: Connected " + connection.get.client.getClientId)
-        println("CONN: username: " + connection.get.client.getClientId + ", password: "+ mqttAttributes.password)
         doAction(session, token.getClient)
       }
       
