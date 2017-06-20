@@ -11,157 +11,20 @@ import io.gatling.core.session._
 import io.gatling.commons.util.TimeHelper._
 import io.gatling.commons.validation.Validation
 import io.gatling.core.stats.message.ResponseTimings
-import org.jiris.gatling.mqtt.protocol.MqttProtocol
 import scala.util.control.NonFatal
 import java.util.UUID
 import org.eclipse.paho.client.mqttv3._
 import org.fusesource.mqtt.client.CallbackConnection
 import org.fusesource.mqtt.client.QoS
 
-case class ConnectionBuilder(client: MqttAsyncClient, options: MqttConnectOptions)
-
 class PahoMqttRequestAction(
-  val statsEngine: StatsEngine,
-  val mqttAttributes: MqttAttributes,
-  val mqttProtocol: MqttProtocol,
-  val next: Action)
-    extends ExitableAction  {
+  override val statsEngine: StatsEngine,
+  override val mqttAttributes: MqttAttributes,
+  override val mqttProtocol: MqttProtocol,
+  override val next: Action)
+    extends PahoMqttBaseAction(statsEngine, mqttAttributes, mqttProtocol, next)  {
 
-  private def configureHostAndClientId(session: Session, mqttAttributes: MqttAttributes)(mqtt: ConnectionBuilder): Validation[ConnectionBuilder] = {
-    mqttProtocol.host match {
-      case Some(host) => host(session).flatMap { host =>
-        mqttAttributes.clientId match {
-          case Some(clientId) => clientId(session).map { clientId => ConnectionBuilder(new MqttAsyncClient(host, clientId), new MqttConnectOptions) } 
-          case None => mqttProtocol.optionPart.clientId match {
-            case Some(clientId) => clientId(session).map { clientId => ConnectionBuilder(new MqttAsyncClient(host, clientId), new MqttConnectOptions) }
-            case None => ConnectionBuilder(new MqttAsyncClient(host, UUID.randomUUID.toString), new MqttConnectOptions)
-          }
-        }
-      }
-      case None => ConnectionBuilder(new MqttAsyncClient("tcp://localhost:1883", UUID.randomUUID.toString), new MqttConnectOptions)
-    }
-  }
-
-  private def configureUserName(session: Session, mqttAttributes: MqttAttributes)(mqtt: ConnectionBuilder): Validation[ConnectionBuilder] = {
-    
-    if(!Some(mqttAttributes.username).isEmpty){
-      mqttAttributes.username match {
-        case Some(username) => username(session).map { resolvedUserName =>
-          mqtt.options.setUserName(resolvedUserName)
-          mqtt
-        } 
-        case None => mqtt
-      }
-    } else {
-      mqttProtocol.optionPart.userName match {
-        case Some(userName) => userName(session).map { resolvedUserName =>
-          mqtt.options.setUserName(resolvedUserName)
-          mqtt
-        }
-        case None => mqtt
-      }
-    }
-  }
-
-  private def configurePassword(session: Session, mqttAttributes: MqttAttributes)(mqtt: ConnectionBuilder): Validation[ConnectionBuilder] = {
-     if(!Some(mqttAttributes.password).isEmpty){
-      mqttAttributes.password match {
-      case Some(password) => password(session).map { resolvedPassword =>
-        mqtt.options.setPassword(resolvedPassword.toCharArray)
-        mqtt
-      } 
-      case None => {
-        mqtt
-      }
-      }
-     } else {
-        mqttProtocol.optionPart.password match {
-          case Some(password) => password(session).map { resolvedPassword =>
-            mqtt.options.setPassword(resolvedPassword.toCharArray)
-            mqtt
-          }
-          case None => mqtt
-        }
-     }
-  }
-
-  private def configureWillTopic(session: Session)(mqtt: ConnectionBuilder): Validation[ConnectionBuilder] = {
-    mqttProtocol.optionPart.willTopic match {
-      case Some(willTopic) => willTopic(session).flatMap { resolvedWillTopic =>
-        val willQosInt = mqttProtocol.optionPart.willQosInt.getOrElse(0)
-        val willRetain = mqttProtocol.optionPart.willRetain.getOrElse(false)
-        mqttProtocol.optionPart.willMessage match {
-          case Some(willMessage) => willMessage(session).map { resolvedWillMessage =>
-            mqtt.options.setWill(resolvedWillTopic, resolvedWillMessage.getBytes, willQosInt, willRetain)
-            mqtt
-          }
-          case None => {
-            mqtt.options.setWill(resolvedWillTopic, Array[Byte](), willQosInt, willRetain)
-            mqtt
-          }
-        }
-      }
-      case None => mqtt
-    }
-  }
-
-  private def configureVersion(session: Session)(mqtt: ConnectionBuilder): Validation[ConnectionBuilder] = {
-    mqttProtocol.optionPart.version match {
-      case Some(version) => version(session).map { resolvedVersion =>
-        mqtt.options.setMqttVersion(resolvedVersion.toInt)
-        mqtt
-      }
-      case None => mqtt
-    }
-  }
-
-  private def configureOptions(mqtt: ConnectionBuilder) = {
-    // optionPart
-    val cleanSession = mqttProtocol.optionPart.cleanSession
-    if (cleanSession.isDefined) {
-      mqtt.options.setCleanSession(cleanSession.get)
-    }
-    val keepAlive = mqttProtocol.optionPart.keepAlive
-    if (keepAlive.isDefined) {
-      mqtt.options.setKeepAliveInterval(keepAlive.get)
-    }
-    val receiveBufferSize = mqttProtocol.socketPart.receiveBufferSize
-    if (receiveBufferSize.isDefined) {
-      val bufferOpts = new DisconnectedBufferOptions
-      bufferOpts.setBufferSize(receiveBufferSize.get)
-      mqtt.client.setBufferOpts(bufferOpts)
-    }
-  }
-  
-  override def name:String =" Name"
-  
-  override def execute(session: Session):Unit = recover(session) {
-    mqttProtocol.socketPart.shareConnection match {
-      case Some(true) =>
-        PahoCallbackConnections(session) match {
-          case Some(connection) => send(session, connection)
-          case _ =>
-            createClientAndOptions(session).map { connection =>
-              PahoCallbackConnections += session -> connection.client
-              connectAndSend(session, connection)
-            }
-        }
-      case _ => createClientAndOptions(session).map { connectAndSend(session, _) }
-        
-    }
-  }
-
-  private def createClientAndOptions(session: Session) =
-    configureHostAndClientId(session,mqttAttributes)(null)
-      .flatMap(configureUserName(session,mqttAttributes))
-      .flatMap(configurePassword(session,mqttAttributes))
-      .flatMap(configureWillTopic(session))
-      .flatMap(configureVersion(session)).map { builder =>
-        configureOptions(builder)
-        builder
-      }
-
-  private def connectAndSend(session: Session, connection: ConnectionBuilder) {
+  override def connectAndExecute(session: Session, connection: ConnectionBuilder) {
     connection.options.setConnectionTimeout(0)
     connection.client.setCallback(new MqttCallback {
       def connectionLost(error: Throwable) {
@@ -177,7 +40,7 @@ class PahoMqttRequestAction(
     connection.client.connect(connection.options, null, new IMqttActionListener {
       override def onSuccess(token: IMqttToken) {
         println("CONN: Connected " + connection.get.client.getClientId)
-        send(session, token.getClient)
+        doAction(session, token.getClient)
       }
       
       override def onFailure(token: IMqttToken, value: Throwable) {
@@ -199,7 +62,7 @@ class PahoMqttRequestAction(
     })
   }
   
-  private def send(session: Session, connection: IMqttAsyncClient) {
+  override def doAction(session: Session, connection: IMqttAsyncClient) {
     mqttAttributes.requestName(session).flatMap { resolvedRequestName =>
       mqttAttributes.topic(session).flatMap { resolvedTopic =>
         sendRequest(
@@ -266,30 +129,6 @@ class PahoMqttRequestAction(
           e.printStackTrace()
           throw e
       }
-    }
-  }
-}
-
-object PahoCallbackConnections {
-  private val connsBySession = collection.mutable.Map[String, IMqttAsyncClient]()
-  
-  private def key(session: Session) = s"${session.scenario}:${session.userId}"
-  
-  def apply(session: Session) = synchronized {
-    connsBySession.get(key(session))
-  }
-
-  def +=(tuple: Tuple2[Session, IMqttAsyncClient]) = synchronized {
-    connsBySession += key(tuple._1) -> tuple._2
-  }
-  
-  // TODO call this from somewhere to dispose connections after test is done
-  def close(session: Session) = {
-    connsBySession.get(key(session)) match {
-      case Some(connection) => try connection.disconnect catch {
-        case NonFatal(e) => // ignore
-      }
-      case _ => // ignore
     }
   }
 }

@@ -1,6 +1,6 @@
 name := "gatling-mqtt"
 
-version := "0.0.4-SNAPSHOT"
+version := "0.0.7-SNAPSHOT"
 
 scalaVersion := "2.11.5"
 
@@ -16,6 +16,13 @@ libraryDependencies ++= Seq(
   "org.fusesource.mqtt-client" % "mqtt-client" % "1.10",
   "org.eclipse.paho" % "org.eclipse.paho.client.mqttv3" % "1.1.0"
 )
+
+assemblyMergeStrategy in assembly := {
+  case PathList(ps @ _*) if ps.last endsWith ".properties" => MergeStrategy.first
+  case x =>
+    val oldStrategy = (assemblyMergeStrategy in assembly).value
+    oldStrategy(x)
+}
 
 // Gatling contains scala-library
 assemblyOption in assembly := (assemblyOption in assembly).value
